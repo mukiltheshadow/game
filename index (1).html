@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17181b" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Endless Chain is an unlimited word chain puzzle. Fill in the missing words so every neighboring pair makes a phrase.">
+<meta property="og:title" content="Endless Chain - Unlimited Word Chain Puzzle">
+<meta property="og:description" content="Connect the 7-word chain. Play as many puzzles as you want.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%97%3C/text%3E%3C/svg%3E">
+<title>Endless Chain - Unlimited Word Chain Puzzle</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --fg: #1d1d1f; --muted: #6b6b70; --tile: #ffffff; --tile-border: #d3d0c8;
+    --given: #2f3a4a; --given-fg: #ffffff; --solved: #3f9a62; --locked: #3f9a62;
+    --present: #d6a52b; --absent: #8a8a90; --active: #3b6fd4; --key: #dcd9d0; --key-fg: #1d1d1f;
+    --card: #ffffff; --shadow: 0 6px 24px rgba(0,0,0,.15);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181b; --fg: #eeeeef; --muted: #9a9aa2; --tile: #22242a; --tile-border: #3a3d46;
+      --given: #3a4760; --given-fg: #ffffff; --solved: #2f8553; --locked: #2f8553;
+      --present: #b88a1c; --absent: #55565d; --active: #6b94ee; --key: #353841; --key-fg: #eeeeef;
+      --card: #24262c; --shadow: 0 6px 24px rgba(0,0,0,.5);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; touch-action: manipulation; }
+  body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
+    padding: 0 16px env(safe-area-inset-bottom); max-width: 520px; margin: 0 auto; user-select: none; -webkit-user-select: none; }
+  header { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 0 6px; gap: 8px; }
+  h1 { font-size: 17px; letter-spacing: .12em; margin: 0; font-weight: 800; text-align: center; flex: 1; white-space: nowrap; }
+  .hgroup { display: flex; gap: 6px; }
+  .icon-btn { background: none; border: 1px solid var(--tile-border); color: var(--fg); border-radius: 10px;
+    width: 36px; height: 36px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .icon-btn:hover { border-color: var(--active); }
+  button:focus-visible { outline: 2px solid var(--active); outline-offset: 2px; }
+  .stats { width: 100%; display: flex; justify-content: space-around; font-size: 13px; color: var(--muted); padding: 6px 0 8px; }
+  .stats b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .badge { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; border: 1px solid var(--tile-border);
+    border-radius: 99px; padding: 2px 8px; color: var(--muted); }
+  #board { width: 100%; display: flex; flex-direction: column; align-items: center; flex: 1; justify-content: center;
+    --ts: min(46px, calc((100vw - 60px) / var(--n, 7) - 5px)); }
+  .row { display: flex; gap: 5px; padding: 4px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; }
+  .row.active { border-color: var(--active); }
+  .row.done { cursor: default; }
+  .link { width: 4px; height: 8px; background: var(--tile-border); border-radius: 2px; margin: 1px 0; }
+  .tile { width: var(--ts); height: var(--ts); display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: calc(var(--ts) * .5); border-radius: 8px; border: 2px solid var(--tile-border); background: var(--tile); }
+  .tile.given { background: var(--given); border-color: var(--given); color: var(--given-fg); }
+  .tile.solved { background: var(--solved); border-color: var(--solved); color: #fff; }
+  .tile.locked { background: var(--locked); border-color: var(--locked); color: #fff; }
+  .tile.present { background: var(--present); border-color: var(--present); color: #fff; }
+  .tile.absent { background: var(--absent); border-color: var(--absent); color: #fff; }
+  .tile.filled { border-color: var(--fg); }
+  .tile.cursor { border-color: var(--active); }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+  .row.shake { animation: shake .4s; }
+  @keyframes pop { 50% { transform: scale(1.12); } }
+  .row.pop .tile { animation: pop .3s; }
+  @media (prefers-reduced-motion: reduce) { .row.shake, .row.pop .tile { animation: none; } }
+  #toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg);
+    padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 50; max-width: 90vw; text-align: center; }
+  #toast.show { opacity: 1; }
+  .actions { display: flex; gap: 8px; margin: 8px 0; }
+  .actions button { background: none; border: 1px solid var(--tile-border); color: var(--fg); padding: 8px 14px;
+    border-radius: 10px; font-size: 14px; cursor: pointer; }
+  #kb { width: 100%; padding-bottom: 14px; }
+  .krow { display: flex; justify-content: center; gap: 5px; margin-bottom: 6px; }
+  .key { flex: 1; max-width: 44px; height: 50px; border: none; border-radius: 8px; background: var(--key); color: var(--key-fg);
+    font-weight: 700; font-size: 15px; cursor: pointer; }
+  .key.wide { max-width: 66px; font-size: 12px; }
+  .key:active { opacity: .7; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; z-index: 30; padding: 16px; }
+  .modal.open { display: flex; }
+  .card { background: var(--card); border-radius: 16px; padding: 22px; width: 100%; max-width: 380px; box-shadow: var(--shadow);
+    max-height: 90vh; overflow-y: auto; user-select: text; -webkit-user-select: text; }
+  .card h2 { margin: 0 0 10px; }
+  .card p, .card li { color: var(--muted); font-size: 15px; line-height: 1.45; }
+  .card ul { padding-left: 18px; margin: 8px 0 14px; }
+  .card .primary { width: 100%; background: var(--active); color: #fff; border: none; border-radius: 10px; padding: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+  .card .secondary { width: 100%; background: none; color: var(--fg); border: 1px solid var(--tile-border); border-radius: 10px; padding: 11px; font-size: 15px; cursor: pointer; margin-top: 8px; }
+  .line { display: flex; justify-content: space-between; padding: 4px 0; color: var(--muted); font-size: 15px; }
+  .line b { color: var(--fg); }
+  .line.final { color: var(--fg); font-weight: 800; font-size: 18px; border-top: 1px solid var(--tile-border); margin-top: 6px; padding-top: 10px; }
+  .chain-preview { text-align: center; font-weight: 700; letter-spacing: .04em; margin: 10px 0; color: var(--fg); font-size: 14px; line-height: 1.5; }
+  .seg { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+  .seg button { text-align: left; background: none; color: var(--fg); border: 2px solid var(--tile-border); border-radius: 10px; padding: 10px 12px; cursor: pointer; font-size: 15px; }
+  .seg button small { display: block; color: var(--muted); margin-top: 2px; font-size: 13px; }
+  .seg button.on { border-color: var(--active); }
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="hgroup">
+      <button class="icon-btn" id="helpBtn" aria-label="How to play">?</button>
+      <button class="icon-btn" id="statsBtn" aria-label="Statistics">&#128202;</button>
+    </div>
+    <h1>ENDLESS CHAIN</h1>
+    <div class="hgroup">
+      <button class="icon-btn" id="setBtn" aria-label="Settings">&#9881;</button>
+      <button class="icon-btn" id="newBtn" aria-label="New puzzle">&#8635;</button>
+    </div>
+  </header>
+
+  <div class="stats">
+    <span>Score <b id="score">100</b></span>
+    <span>Time <b id="time">00:00</b></span>
+    <span>Hints <b id="hints">0</b></span>
+    <span class="badge" id="diffBadge">Normal</span>
+  </div>
+
+  <div id="board" role="group" aria-label="Word chain"></div>
+
+  <div class="actions">
+    <button id="clearBtn">Clear row</button>
+    <button id="revealBtn">Reveal letter (-5)</button>
+  </div>
+
+  <div id="kb" aria-label="Keyboard"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <canvas id="fx"></canvas>
+
+  <div class="modal" id="helpModal" role="dialog" aria-modal="true" aria-label="How to play">
+    <div class="card">
+      <h2>How to play</h2>
+      <ul>
+        <li>Fill in the 5 missing middle words of the chain.</li>
+        <li>Every neighboring pair makes a phrase or compound word, like SILVER &rarr; LINING &rarr; FABRIC.</li>
+        <li>Tap any open row to jump to it, or use the up and down arrow keys. Solve in any order.</li>
+        <li>A wrong guess keeps the letters in the right spot and briefly shows yellow (wrong spot) or gray (not in the word).</li>
+        <li>Your score drops for hints, wrong guesses and slow solves.</li>
+        <li>Finish a chain and start another. There is no daily limit.</li>
+      </ul>
+      <button class="primary" data-close="helpModal">Got it</button>
+    </div>
+  </div>
+
+  <div class="modal" id="setModal" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="card">
+      <h2>Difficulty</h2>
+      <div class="seg" id="diffSeg"></div>
+      <p>Changes apply from your next puzzle.</p>
+      <button class="primary" data-close="setModal">Done</button>
+    </div>
+  </div>
+
+  <div class="modal" id="statsModal" role="dialog" aria-modal="true" aria-label="Statistics">
+    <div class="card">
+      <h2>Your stats</h2>
+      <div class="line"><span>Chains solved</span><b id="sSolved">0</b></div>
+      <div class="line"><span>Best score</span><b id="sBest">0</b></div>
+      <div class="line"><span>Average score</span><b id="sAvg">0</b></div>
+      <div class="line"><span>Perfect chains (no hints or misses)</span><b id="sPerfect">0</b></div>
+      <div class="line"><span>Puzzles available</span><b id="sTotal">0</b></div>
+      <button class="primary" data-close="statsModal">Close</button>
+    </div>
+  </div>
+
+  <div class="modal" id="winModal" role="dialog" aria-modal="true" aria-label="Chain complete">
+    <div class="card">
+      <h2>Chain complete!</h2>
+      <div class="chain-preview" id="chainPreview"></div>
+      <div class="line"><span>Base score</span><span id="wBase">100</span></div>
+      <div class="line"><span>Time penalty</span><span id="wTime">-0</span></div>
+      <div class="line"><span>Hint penalty</span><span id="wHint">-0</span></div>
+      <div class="line"><span>Mistake penalty</span><span id="wMiss">-0</span></div>
+      <div class="line final"><span>Final score</span><span id="wFinal">0</span></div>
+      <div class="line"><span>Best score</span><span id="wBest">0</span></div>
+      <button class="primary" id="nextBtn">Next puzzle</button>
+      <button class="secondary" id="shareBtn">Share score</button>
+    </div>
+  </div>
+
+<script>
+// Each chain has 7 words. Every neighboring pair forms a common phrase or compound word.
+// To add puzzles, add a new line below. Use CAPITAL letters only, 2 to 9 letters per word.
+const CHAINS = [
+  ["SUN","FLOWER","POT","HOLE","PUNCH","LINE","DANCE"],
+  ["BASKET","BALL","ROOM","SERVICE","CHARGE","CARD","GAME"],
+  ["RAIN","BOW","TIE","BREAK","FAST","FOOD","COURT"],
+  ["HOT","DOG","HOUSE","PLANT","FOOD","CHAIN","SAW"],
+  ["SNOW","BALL","PARK","BENCH","PRESS","RELEASE","DATE"],
+  ["MOON","LIGHT","HOUSE","KEY","BOARD","GAME","SHOW"],
+  ["GOLD","FISH","BOWL","CUT","BACK","PACK","RAT"],
+  ["WATER","FALL","BACK","YARD","STICK","SHIFT","KEY"],
+  ["HEAD","LIGHT","YEAR","BOOK","CASE","STUDY","HALL"],
+  ["CORN","FIELD","TRIP","WIRE","FRAME","WORK","SHOP"],
+  ["PAPER","WEIGHT","LOSS","LEADER","BOARD","GAME","PLAN"],
+  ["DOOR","BELL","PEPPER","MINT","TEA","SPOON","FEED"],
+  ["FOOT","NOTE","BOOK","WORM","HOLE","PUNCH","LINE"],
+  ["BIRTH","DAY","DREAM","TEAM","WORK","BENCH","MARK"],
+  ["STAR","FISH","TANK","TOP","HAT","TRICK","SHOT"],
+  ["BLUE","BIRD","HOUSE","GUEST","LIST","PRICE","TAG"],
+  ["ICE","CREAM","CHEESE","CAKE","POP","STAR","SHIP"],
+  ["SKY","DIVE","BOMB","SHELL","GAME","SHOW","BOAT"],
+  ["FIRE","FLY","PAPER","CLIP","BOARD","WALK","WAY"],
+  ["TOOTH","BRUSH","FIRE","TRUCK","STOP","WATCH","DOG"],
+  ["BUTTER","FLY","WHEEL","CHAIR","LIFT","OFF","SIDE"],
+  ["EYE","DROP","KICK","BACK","DOOR","BELL","BOY"],
+  ["RAIL","ROAD","TRIP","WIRE","TAP","DANCE","FLOOR"],
+  ["POP","CORN","BREAD","BASKET","CASE","FILE","FOLDER"],
+  ["TOMATO","SOUP","SPOON","FEED","BACK","BONE","MARROW"],
+  ["CAR","POOL","TABLE","TENNIS","BALL","PARK","BENCH"],
+  ["SHOE","BOX","CAR","POOL","PARTY","LINE","BACKER"],
+  ["HIGH","SCHOOL","BUS","STOP","LIGHT","SHOW","CASE"],
+  ["WATCH","TOWER","BLOCK","PARTY","LINE","COOK","BOOK"],
+  ["GRAPE","JELLY","FISH","TANK","TOP","SECRET","AGENT"],
+  ["KEY","CHAIN","LETTER","BOX","OFFICE","SPACE","SHIP"],
+  ["DAY","BREAK","DANCE","FLOOR","BOARD","GAME","PLAN"],
+  ["BLACK","MAIL","BOX","SEAT","BELT","LOOP","HOLE"],
+  ["BOOK","SHELF","LIFE","GUARD","DOG","HOUSE","PARTY"],
+  ["NIGHT","CLUB","HOUSE","MUSIC","BOX","OFFICE","HOURS"],
+  ["NEWS","PAPER","TRAIL","MIX","TAPE","DECK","HAND"]
+].filter(c => {
+  const ok = Array.isArray(c) && c.length === 7 && c.every(w => /^[A-Z]{2,9}$/.test(w));
+  if (!ok) console.warn("Skipping invalid chain:", c);
+  return ok;
+});
+
+const DIFFS = {
+  easy:   { label: "Easy",   base: 80,  desc: "First letter of each word is filled in. Max score 80." },
+  normal: { label: "Normal", base: 100, desc: "The standard puzzle. Max score 100." },
+  hard:   { label: "Hard",   base: 120, desc: "No color feedback on wrong guesses. Max score 120." }
+};
+const K_STATS = "endlessChain.stats", K_STATE = "endlessChain.state", K_SEEN = "endlessChain.seen",
+      K_SET = "endlessChain.settings", K_HELP = "endlessChain.helpSeen";
+
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+
+const $ = id => document.getElementById(id);
+let chain, rows, active, mistakes, hints, elapsed, lastTick, over, busy, gameId = 0, diff = "normal";
+let stats = Object.assign({ solved: 0, best: 0, total: 0, perfect: 0 }, store.get(K_STATS) || {});
+const saved = store.get(K_SET); if (saved && DIFFS[saved.diff]) diff = saved.diff;
+
+const chainKey = c => c.join("-");
+
+function pickChain() {
+  let seen = store.get(K_SEEN); if (!Array.isArray(seen)) seen = [];
+  let pool = CHAINS.filter(c => !seen.includes(chainKey(c)));
+  if (!pool.length) { seen = []; pool = CHAINS.slice(); }
+  const c = pool[Math.floor(Math.random() * pool.length)];
+  seen.push(chainKey(c)); store.set(K_SEEN, seen);
+  return c;
+}
+
+function buildRows(c, d) {
+  return c.map((w, i) => {
+    const given = i === 0 || i === c.length - 1;
+    const r = { word: w, solved: given, given, misses: 0, hinted: false, flash: null,
+      locked: Array(w.length).fill(given), letters: given ? w.split("") : Array(w.length).fill("") };
+    if (!given && d === "easy") { r.letters[0] = w[0]; r.locked[0] = true; }
+    return r;
+  });
+}
+
+function newGame() {
+  gameId++;
+  chain = pickChain();
+  rows = buildRows(chain, diff);
+  active = 1; mistakes = 0; hints = 0; elapsed = 0; lastTick = Date.now(); over = false; busy = false;
+  $("winModal").classList.remove("open");
+  render(); updateStats();
+}
+
+function restore() {
+  const s = store.get(K_STATE);
+  try {
+    if (!s || !Array.isArray(s.rows) || s.rows.length !== 7 || !DIFFS[s.diff]) return false;
+    const words = s.rows.map(r => r.word);
+    const found = CHAINS.find(c => c.join() === words.join());
+    if (!found) return false;
+    for (const r of s.rows) {
+      const n = r.word.length;
+      if (!Array.isArray(r.letters) || r.letters.length !== n || !Array.isArray(r.locked) || r.locked.length !== n) return false;
+      if (!r.letters.every(ch => ch === "" || /^[A-Z]$/.test(ch))) return false;
+    }
+    if (s.rows.every(r => r.solved)) return false;
+    chain = found; diff = s.diff;
+    rows = s.rows.map(r => ({ word: r.word, solved: !!r.solved, given: !!r.given, misses: r.misses | 0, hinted: !!r.hinted,
+      flash: null, locked: r.locked.map(Boolean), letters: r.letters.slice() }));
+    active = Math.min(6, Math.max(0, s.active | 0)); if (rows[active].solved) active = nextOpenRow();
+    mistakes = s.mistakes | 0; hints = s.hints | 0; elapsed = Math.max(0, +s.elapsed || 0);
+    lastTick = Date.now(); over = false; busy = false; gameId++;
+    render(); updateStats();
+    return true;
+  } catch (e) { return false; }
+}
+
+function saveState() {
+  if (over) return;
+  store.set(K_STATE, { diff, active, mistakes, hints, elapsed,
+    rows: rows.map(r => ({ word: r.word, solved: r.solved, given: r.given, misses: r.misses, hinted: r.hinted, locked: r.locked, letters: r.letters })) });
+}
+
+const seconds = () => Math.floor(elapsed / 1000);
+const timePenalty = () => Math.min(25, Math.floor(seconds() / 30));
+const currentScore = () => Math.max(0, DIFFS[diff].base - timePenalty() - hints * 5 - mistakes * 2);
+const fmt = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+
+function updateStats() {
+  $("score").textContent = currentScore();
+  $("time").textContent = fmt(seconds());
+  $("hints").textContent = hints;
+  $("diffBadge").textContent = DIFFS[diff].label;
+}
+
+function tick() {
+  const now = Date.now(), dt = now - lastTick; lastTick = now;
+  if (over || document.hidden || document.querySelector(".modal.open")) return;
+  elapsed += Math.min(dt, 2000);
+  updateStats();
+}
+setInterval(tick, 250);
+document.addEventListener("visibilitychange", () => { lastTick = Date.now(); if (document.hidden) saveState(); });
+
+function cursorIndex(r) { return r.letters.findIndex((ch, i) => !r.locked[i] && ch === ""); }
+
+function render(fx) {
+  const board = $("board");
+  board.style.setProperty("--n", Math.max.apply(null, chain.map(w => w.length)));
+  board.innerHTML = "";
+  rows.forEach((r, i) => {
+    const el = document.createElement("div");
+    el.className = "row" + (i === active && !r.solved ? " active" : "") + (r.solved ? " done" : "");
+    if (fx && fx.i === i) el.classList.add(fx.cls);
+    el.setAttribute("role", "group");
+    el.setAttribute("aria-label", "Word " + (i + 1) + " of " + rows.length + ", " + r.word.length + " letters" +
+      (r.solved ? ", " + r.word : ", unsolved"));
+    const cur = (i === active && !r.solved) ? cursorIndex(r) : -1;
+    r.letters.forEach((ch, k) => {
+      const t = document.createElement("div");
+      let cls = "tile";
+      if (r.given) cls += " given";
+      else if (r.solved) cls += " solved";
+      else if (r.flash) cls += " " + r.flash[k];
+      else if (r.locked[k]) cls += " locked";
+      else if (ch) cls += " filled";
+      else if (k === cur) cls += " cursor";
+      t.className = cls; t.textContent = ch;
+      el.appendChild(t);
+    });
+    el.addEventListener("click", () => { if (!r.solved && !over && !busy) { active = i; render(); saveState(); } });
+    board.appendChild(el);
+    if (i < rows.length - 1) { const l = document.createElement("div"); l.className = "link"; board.appendChild(l); }
+  });
+}
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove("show"), 1400);
+}
+
+function canAct() { return !over && !busy && !document.querySelector(".modal.open"); }
+
+function typeLetter(c) {
+  if (!canAct()) return;
+  const r = rows[active]; if (r.solved) return;
+  const k = cursorIndex(r); if (k === -1) return;
+  r.letters[k] = c; render(); saveState();
+}
+
+function backspace() {
+  if (!canAct()) return;
+  const r = rows[active]; if (r.solved) return;
+  for (let i = r.letters.length - 1; i >= 0; i--) {
+    if (!r.locked[i] && r.letters[i] !== "") { r.letters[i] = ""; break; }
+  }
+  render(); saveState();
+}
+
+function clearRow() {
+  if (!canAct()) return;
+  const r = rows[active]; if (r.solved) return;
+  r.letters = r.letters.map((ch, i) => r.locked[i] ? ch : "");
+  render(); saveState();
+}
+
+function nextOpenRow() {
+  for (let step = 1; step <= rows.length; step++) {
+    const i = (active + step) % rows.length;
+    if (!rows[i].solved) return i;
+  }
+  return -1;
+}
+
+function moveRow(dir) {
+  if (!canAct()) return;
+  for (let step = 1; step <= rows.length; step++) {
+    const i = (active + dir * step + rows.length * 2) % rows.length;
+    if (!rows[i].solved) { active = i; render(); saveState(); return; }
+  }
+}
+
+function solveRow(r, i) {
+  r.solved = true; r.letters = r.word.split(""); r.locked = r.locked.map(() => true); r.flash = null;
+  if (rows.every(x => x.solved)) { render({ i, cls: "pop" }); win(); return; }
+  const n = nextOpenRow(); if (n !== -1) active = n;
+  render({ i, cls: "pop" }); saveState();
+}
+
+function submit() {
+  if (!canAct()) return;
+  const r = rows[active]; if (r.solved) return;
+  if (r.letters.some(ch => ch === "")) { toast("Not enough letters"); render({ i: active, cls: "shake" }); return; }
+  const guess = r.letters.join("");
+  if (guess === r.word) { solveRow(r, active); return; }
+
+  mistakes++; r.misses++;
+  if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+  const counts = {};
+  for (let i = 0; i < r.word.length; i++) if (guess[i] !== r.word[i]) counts[r.word[i]] = (counts[r.word[i]] || 0) + 1;
+  if (diff !== "hard") {
+    r.flash = r.word.split("").map((_, i) => {
+      if (guess[i] === r.word[i]) return "locked";
+      if (counts[guess[i]] > 0) { counts[guess[i]]--; return "present"; }
+      return "absent";
+    });
+  }
+  busy = true;
+  const idx = active, id = gameId;
+  render({ i: idx, cls: "shake" }); updateStats(); toast("Not quite");
+  setTimeout(() => {
+    if (id !== gameId) return;
+    r.flash = null; busy = false;
+    if (diff === "hard") {
+      r.letters = r.letters.map((ch, k) => r.locked[k] ? ch : "");
+    } else {
+      r.letters = r.letters.map((ch, k) => (guess[k] === r.word[k] || r.locked[k]) ? r.word[k] : "");
+      r.locked = r.locked.map((l, k) => l || guess[k] === r.word[k]);
+    }
+    render(); saveState();
+  }, diff === "hard" ? 500 : 900);
+}
+
+function reveal() {
+  if (!canAct()) return;
+  const r = rows[active]; if (r.solved) return;
+  const k = r.locked.findIndex(l => !l);
+  if (k === -1) return;
+  r.letters[k] = r.word[k]; r.locked[k] = true; r.hinted = true; hints++;
+  updateStats();
+  if (r.locked.every(Boolean)) solveRow(r, active); else { render(); saveState(); }
+}
+
+function win() {
+  over = true; store.del(K_STATE);
+  const final = currentScore();
+  const perfect = hints === 0 && mistakes === 0;
+  stats.solved++; stats.total += final; if (final > stats.best) stats.best = final; if (perfect) stats.perfect++;
+  store.set(K_STATS, stats);
+  $("wBase").textContent = DIFFS[diff].base;
+  $("wTime").textContent = "-" + timePenalty();
+  $("wHint").textContent = "-" + hints * 5;
+  $("wMiss").textContent = "-" + mistakes * 2;
+  $("wFinal").textContent = final;
+  $("wBest").textContent = stats.best;
+  $("chainPreview").textContent = chain.join(" \u2192 ");
+  updateStats();
+  setTimeout(() => { $("winModal").classList.add("open"); confetti(); }, 600);
+}
+
+function share() {
+  const emoji = rows.map((r, i) => (i === 0 || i === rows.length - 1) ? "\u2B1B" : r.hinted ? "\u{1F7E6}" : r.misses ? "\u{1F7E8}" : "\u{1F7E9}").join("");
+  const text = "Endless Chain \u{1F517} (" + DIFFS[diff].label + ")\n" + emoji + "\nScore " + currentScore() + " | " + fmt(seconds()) +
+    " | " + hints + " hints | " + mistakes + " misses";
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast("Copied to clipboard"), () => toast(text));
+  } else toast(text);
+}
+
+function confetti() {
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const c = $("fx"), ctx = c.getContext("2d"); if (!ctx) return;
+  c.width = innerWidth; c.height = innerHeight;
+  const colors = ["#3f9a62", "#d6a52b", "#3b6fd4", "#d4553b", "#8a5bd4"];
+  const ps = Array.from({ length: 140 }, () => ({
+    x: Math.random() * c.width, y: -20 - Math.random() * c.height * 0.4, vx: (Math.random() - .5) * 3, vy: 2 + Math.random() * 4,
+    s: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3, col: colors[(Math.random() * colors.length) | 0]
+  }));
+  let frames = 0;
+  (function step() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    ps.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.col;
+      ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * .6); ctx.restore();
+    });
+    if (++frames < 160) requestAnimationFrame(step); else ctx.clearRect(0, 0, c.width, c.height);
+  })();
+}
+
+// Modals
+function openModal(id) { $(id).classList.add("open"); }
+function closeModal(id) { $(id).classList.remove("open"); lastTick = Date.now(); }
+document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => closeModal(b.dataset.close)));
+document.querySelectorAll(".modal").forEach(m => m.addEventListener("click", e => {
+  if (e.target === m && m.id !== "winModal") closeModal(m.id);
+}));
+
+function openStats() {
+  $("sSolved").textContent = stats.solved;
+  $("sBest").textContent = stats.best;
+  $("sAvg").textContent = stats.solved ? Math.round(stats.total / stats.solved) : 0;
+  $("sPerfect").textContent = stats.perfect;
+  $("sTotal").textContent = CHAINS.length;
+  openModal("statsModal");
+}
+
+function renderDiffs() {
+  const seg = $("diffSeg"); seg.innerHTML = "";
+  Object.keys(DIFFS).forEach(k => {
+    const b = document.createElement("button");
+    b.className = k === diff ? "on" : "";
+    b.innerHTML = "<b>" + DIFFS[k].label + "</b><small>" + DIFFS[k].desc + "</small>";
+    b.addEventListener("click", () => {
+      diff = k; store.set(K_SET, { diff });
+      if (rows && !over) saveState();
+      renderDiffs(); toast(DIFFS[k].label + " mode starts with your next puzzle");
+    });
+    seg.appendChild(b);
+  });
+}
+
+function askNew() {
+  const progress = rows && !over && (hints || mistakes || rows.some(r => !r.given && r.letters.some(Boolean)));
+  if (progress && !confirm("Skip this chain and start a new one?")) return;
+  store.del(K_STATE); newGame();
+}
+
+// On-screen keyboard
+const kb = $("kb");
+["QWERTYUIOP", "ASDFGHJKL", ["ENTER"].concat("ZXCVBNM".split(""), ["BKSP"])].forEach(line => {
+  const row = document.createElement("div"); row.className = "krow";
+  (typeof line === "string" ? line.split("") : line).forEach(k => {
+    const b = document.createElement("button");
+    b.className = "key" + (k === "ENTER" || k === "BKSP" ? " wide" : "");
+    b.textContent = k === "BKSP" ? "\u232B" : k;
+    b.setAttribute("aria-label", k === "BKSP" ? "Backspace" : k === "ENTER" ? "Enter" : k);
+    b.addEventListener("click", () => { if (k === "ENTER") submit(); else if (k === "BKSP") backspace(); else typeLetter(k); });
+    row.appendChild(b);
+  });
+  kb.appendChild(row);
+});
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "Escape") { document.querySelectorAll(".modal.open").forEach(m => { if (m.id !== "winModal") closeModal(m.id); }); return; }
+  if (document.querySelector(".modal.open")) return;
+  if (e.key === "Enter") { e.preventDefault(); submit(); }
+  else if (e.key === "Backspace") { e.preventDefault(); backspace(); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); moveRow(1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); moveRow(-1); }
+  else if (/^[a-zA-Z]$/.test(e.key)) typeLetter(e.key.toUpperCase());
+});
+
+$("clearBtn").addEventListener("click", clearRow);
+$("revealBtn").addEventListener("click", reveal);
+$("newBtn").addEventListener("click", askNew);
+$("nextBtn").addEventListener("click", () => { store.del(K_STATE); newGame(); });
+$("shareBtn").addEventListener("click", share);
+$("helpBtn").addEventListener("click", () => openModal("helpModal"));
+$("statsBtn").addEventListener("click", openStats);
+$("setBtn").addEventListener("click", () => { renderDiffs(); openModal("setModal"); });
+window.addEventListener("beforeunload", saveState);
+
+renderDiffs();
+if (!restore()) newGame();
+if (!store.get(K_HELP)) { openModal("helpModal"); store.set(K_HELP, 1); }
+</script>
+</body>
+</html>
