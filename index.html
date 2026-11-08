@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Endless Chain - Unlimited Word Chain Puzzle</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --fg: #1d1d1f; --muted: #6b6b70; --tile: #ffffff; --tile-border: #d3d0c8;
+    --given: #2f3a4a; --given-fg: #ffffff; --solved: #3f9a62; --locked: #3f9a62;
+    --present: #d6a52b; --absent: #8a8a90; --active: #3b6fd4; --key: #dcd9d0; --key-fg: #1d1d1f;
+    --card: #ffffff; --shadow: 0 6px 24px rgba(0,0,0,.15);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181b; --fg: #eeeeef; --muted: #9a9aa2; --tile: #22242a; --tile-border: #3a3d46;
+      --given: #3a4760; --given-fg: #ffffff; --solved: #2f8553; --locked: #2f8553;
+      --present: #b88a1c; --absent: #55565d; --active: #6b94ee; --key: #353841; --key-fg: #eeeeef;
+      --card: #24262c; --shadow: 0 6px 24px rgba(0,0,0,.5);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; padding: 0 16px; max-width: 520px; margin: 0 auto; }
+  header { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 0 6px; }
+  h1 { font-size: 22px; letter-spacing: .14em; margin: 0; font-weight: 800; }
+  .icon-btn { background: none; border: 1px solid var(--tile-border); color: var(--fg); border-radius: 10px;
+    padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  .stats { width: 100%; display: flex; justify-content: space-around; font-size: 14px; color: var(--muted); padding: 6px 0 10px; }
+  .stats b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  #board { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0; flex: 1; justify-content: center; }
+  .row { display: flex; gap: 5px; padding: 5px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; }
+  .row.active { border-color: var(--active); }
+  .row.done { cursor: default; }
+  .link { font-size: 12px; line-height: 10px; color: var(--muted); height: 12px; }
+  .tile { width: min(46px, 11.5vw); height: min(46px, 11.5vw); display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: min(22px, 5.6vw); border-radius: 8px; border: 2px solid var(--tile-border); background: var(--tile); }
+  .tile.given { background: var(--given); border-color: var(--given); color: var(--given-fg); }
+  .tile.solved { background: var(--solved); border-color: var(--solved); color: #fff; }
+  .tile.locked { background: var(--locked); border-color: var(--locked); color: #fff; }
+  .tile.present { background: var(--present); border-color: var(--present); color: #fff; }
+  .tile.absent { background: var(--absent); border-color: var(--absent); color: #fff; }
+  .tile.filled { border-color: var(--fg); }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+  .row.shake { animation: shake .4s; }
+  @keyframes pop { 50% { transform: scale(1.12); } }
+  .row.pop .tile { animation: pop .3s; }
+  #toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: var(--fg); color: var(--bg);
+    padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+  #toast.show { opacity: 1; }
+  .actions { display: flex; gap: 8px; margin: 8px 0; }
+  .actions button { background: none; border: 1px solid var(--tile-border); color: var(--fg); padding: 8px 14px;
+    border-radius: 10px; font-size: 14px; cursor: pointer; }
+  #kb { width: 100%; padding-bottom: 14px; }
+  .krow { display: flex; justify-content: center; gap: 5px; margin-bottom: 6px; }
+  .key { flex: 1; max-width: 44px; height: 50px; border: none; border-radius: 8px; background: var(--key); color: var(--key-fg);
+    font-weight: 700; font-size: 15px; cursor: pointer; }
+  .key.wide { max-width: 66px; font-size: 12px; }
+  .key:active { opacity: .7; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; z-index: 30; padding: 16px; }
+  .modal.open { display: flex; }
+  .card { background: var(--card); border-radius: 16px; padding: 22px; width: 100%; max-width: 360px; box-shadow: var(--shadow); }
+  .card h2 { margin: 0 0 10px; }
+  .card p, .card li { color: var(--muted); font-size: 15px; line-height: 1.45; }
+  .card ul { padding-left: 18px; margin: 8px 0 14px; }
+  .card .primary { width: 100%; background: var(--active); color: #fff; border: none; border-radius: 10px; padding: 12px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+  .card .secondary { width: 100%; background: none; color: var(--fg); border: 1px solid var(--tile-border); border-radius: 10px; padding: 11px; font-size: 15px; cursor: pointer; margin-top: 8px; }
+  .score-line { display: flex; justify-content: space-between; padding: 4px 0; color: var(--muted); font-size: 15px; }
+  .score-line.final { color: var(--fg); font-weight: 800; font-size: 18px; border-top: 1px solid var(--tile-border); margin-top: 6px; padding-top: 10px; }
+  .chain-preview { text-align: center; font-weight: 700; letter-spacing: .04em; margin: 10px 0; color: var(--fg); font-size: 14px; }
+</style>
+</head>
+<body>
+  <header>
+    <button class="icon-btn" id="helpBtn">How to play</button>
+    <h1>ENDLESS CHAIN</h1>
+    <button class="icon-btn" id="newBtn">New</button>
+  </header>
+
+  <div class="stats">
+    <span>Score <b id="score">100</b></span>
+    <span>Time <b id="time">00:00</b></span>
+    <span>Hints <b id="hints">0</b></span>
+    <span>Solved <b id="played">0</b></span>
+  </div>
+
+  <div id="board"></div>
+
+  <div class="actions">
+    <button id="clearBtn">Clear row</button>
+    <button id="revealBtn">Reveal letter (-5)</button>
+  </div>
+
+  <div id="kb"></div>
+  <div id="toast"></div>
+
+  <div class="modal" id="helpModal">
+    <div class="card">
+      <h2>How to play</h2>
+      <ul>
+        <li>Fill in the 5 missing middle words of the chain.</li>
+        <li>Every neighboring pair makes a phrase or compound word, like SILVER &rarr; LINING &rarr; FABRIC.</li>
+        <li>Tap any open row to jump to it and solve in any order.</li>
+        <li>A wrong guess keeps the letters that are in the right spot and turns the rest yellow (wrong spot) or gray (not in the word) briefly.</li>
+        <li>Score starts at 100. Hints, wrong guesses and slow solves cost points.</li>
+        <li>Finish a chain and start another. There is no daily limit.</li>
+      </ul>
+      <button class="primary" id="helpClose">Got it</button>
+    </div>
+  </div>
+
+  <div class="modal" id="winModal">
+    <div class="card">
+      <h2>Chain complete!</h2>
+      <div class="chain-preview" id="chainPreview"></div>
+      <div class="score-line"><span>Base score</span><span>100</span></div>
+      <div class="score-line"><span>Time penalty</span><span id="wTime">-0</span></div>
+      <div class="score-line"><span>Hint penalty</span><span id="wHint">-0</span></div>
+      <div class="score-line"><span>Mistake penalty</span><span id="wMiss">-0</span></div>
+      <div class="score-line final"><span>Final score</span><span id="wFinal">0</span></div>
+      <div class="score-line"><span>Best score</span><span id="wBest">0</span></div>
+      <button class="primary" id="nextBtn">Next puzzle</button>
+      <button class="secondary" id="shareBtn">Share score</button>
+    </div>
+  </div>
+
+<script>
+// Each chain has 7 words. Every neighboring pair forms a common phrase or compound word.
+const CHAINS = [
+  ["SUN","FLOWER","POT","HOLE","PUNCH","LINE","DANCE"],
+  ["BASKET","BALL","ROOM","SERVICE","CHARGE","CARD","GAME"],
+  ["RAIN","BOW","TIE","BREAK","FAST","FOOD","COURT"],
+  ["HOT","DOG","HOUSE","PLANT","FOOD","CHAIN","SAW"],
+  ["SNOW","BALL","PARK","BENCH","PRESS","RELEASE","DATE"],
+  ["MOON","LIGHT","HOUSE","KEY","BOARD","GAME","SHOW"],
+  ["GOLD","FISH","BOWL","CUT","BACK","PACK","RAT"],
+  ["WATER","FALL","BACK","YARD","STICK","SHIFT","KEY"],
+  ["HEAD","LIGHT","YEAR","BOOK","CASE","STUDY","HALL"],
+  ["CORN","FIELD","TRIP","WIRE","FRAME","WORK","SHOP"],
+  ["PAPER","WEIGHT","LOSS","LEADER","BOARD","GAME","PLAN"],
+  ["DOOR","BELL","PEPPER","MINT","TEA","SPOON","FEED"],
+  ["FOOT","NOTE","BOOK","WORM","HOLE","PUNCH","LINE"],
+  ["BIRTH","DAY","DREAM","TEAM","WORK","BENCH","MARK"],
+  ["STAR","FISH","TANK","TOP","HAT","TRICK","SHOT"],
+  ["BLUE","BIRD","HOUSE","GUEST","LIST","PRICE","TAG"],
+  ["ICE","CREAM","CHEESE","CAKE","POP","STAR","SHIP"],
+  ["SKY","DIVE","BOMB","SHELL","GAME","SHOW","BOAT"]
+];
+
+const $ = id => document.getElementById(id);
+let chain, rows, active, mistakes, hints, seconds, timer, over, bag = [], lastIdx = -1;
+let stats = { solved: 0, best: 0 };
+
+try { const s = JSON.parse(localStorage.getItem("endlessChainStats")); if (s) stats = s; } catch (e) {}
+function saveStats() { try { localStorage.setItem("endlessChainStats", JSON.stringify(stats)); } catch (e) {} }
+
+function nextChainIndex() {
+  if (!bag.length) {
+    bag = CHAINS.map((_, i) => i).sort(() => Math.random() - 0.5);
+    if (bag.length > 1 && bag[bag.length - 1] === lastIdx) bag.unshift(bag.pop());
+  }
+  lastIdx = bag.pop();
+  return lastIdx;
+}
+
+function newGame() {
+  chain = CHAINS[nextChainIndex()];
+  rows = chain.map((w, i) => {
+    const given = i === 0 || i === chain.length - 1;
+    return {
+      word: w, given, solved: given,
+      locked: given ? Array(w.length).fill(true) : Array(w.length).fill(false),
+      letters: given ? w.split("") : Array(w.length).fill(""),
+      flash: null
+    };
+  });
+  active = 1; mistakes = 0; hints = 0; seconds = 0; over = false;
+  clearInterval(timer);
+  timer = setInterval(() => { if (!over) { seconds++; updateStats(); } }, 1000);
+  $("winModal").classList.remove("open");
+  render(); updateStats();
+}
+
+function timePenalty() { return Math.min(25, Math.floor(seconds / 30)); }
+function currentScore() { return Math.max(0, 100 - timePenalty() - hints * 5 - mistakes * 2); }
+function fmt(s) { return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); }
+
+function updateStats() {
+  $("score").textContent = currentScore();
+  $("time").textContent = fmt(seconds);
+  $("hints").textContent = hints;
+  $("played").textContent = stats.solved;
+}
+
+function render(extraClass) {
+  const board = $("board");
+  board.innerHTML = "";
+  rows.forEach((r, i) => {
+    const el = document.createElement("div");
+    el.className = "row" + (i === active && !r.solved ? " active" : "") + (r.solved ? " done" : "");
+    if (extraClass && extraClass.i === i) el.classList.add(extraClass.cls);
+    r.letters.forEach((ch, k) => {
+      const t = document.createElement("div");
+      let cls = "tile";
+      if (r.given) cls += " given";
+      else if (r.solved) cls += " solved";
+      else if (r.flash) cls += " " + r.flash[k];
+      else if (r.locked[k]) cls += " locked";
+      else if (ch) cls += " filled";
+      t.className = cls;
+      t.textContent = ch;
+      el.appendChild(t);
+    });
+    el.addEventListener("click", () => { if (!r.solved && !over) { active = i; render(); } });
+    board.appendChild(el);
+    if (i < rows.length - 1) {
+      const l = document.createElement("div");
+      l.className = "link"; l.textContent = "\u2022";
+      board.appendChild(l);
+    }
+  });
+}
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove("show"), 1300);
+}
+
+function typeLetter(c) {
+  if (over) return;
+  const r = rows[active]; if (r.solved) return;
+  const k = r.letters.findIndex((ch, i) => !r.locked[i] && ch === "");
+  if (k === -1) return;
+  r.letters[k] = c; render();
+}
+
+function backspace() {
+  if (over) return;
+  const r = rows[active]; if (r.solved) return;
+  for (let i = r.letters.length - 1; i >= 0; i--) {
+    if (!r.locked[i] && r.letters[i] !== "") { r.letters[i] = ""; break; }
+  }
+  render();
+}
+
+function clearRow() {
+  if (over) return;
+  const r = rows[active]; if (r.solved) return;
+  r.letters = r.letters.map((ch, i) => r.locked[i] ? ch : "");
+  render();
+}
+
+function nextOpenRow() {
+  for (let step = 1; step <= rows.length; step++) {
+    const i = (active + step) % rows.length;
+    if (!rows[i].solved) return i;
+  }
+  return -1;
+}
+
+function solveRow(r, i) {
+  r.solved = true; r.letters = r.word.split(""); r.locked = r.locked.map(() => true); r.flash = null;
+  if (rows.every(x => x.solved)) { render({ i, cls: "pop" }); win(); return; }
+  const n = nextOpenRow(); if (n !== -1) active = n;
+  render({ i, cls: "pop" });
+}
+
+function submit() {
+  if (over) return;
+  const r = rows[active]; if (r.solved) return;
+  if (r.letters.some(ch => ch === "")) { toast("Not enough letters"); render({ i: active, cls: "shake" }); return; }
+  const guess = r.letters.join("");
+  if (guess === r.word) { solveRow(r, active); return; }
+
+  mistakes++;
+  // Wordle-style feedback for this one attempt
+  const counts = {};
+  for (let i = 0; i < r.word.length; i++) if (guess[i] !== r.word[i]) counts[r.word[i]] = (counts[r.word[i]] || 0) + 1;
+  const flash = r.word.split("").map((_, i) => {
+    if (guess[i] === r.word[i]) return "locked";
+    if (counts[guess[i]] > 0) { counts[guess[i]]--; return "present"; }
+    return "absent";
+  });
+  r.flash = flash;
+  const idx = active;
+  render({ i: idx, cls: "shake" });
+  updateStats();
+  toast("Not quite");
+  setTimeout(() => {
+    r.flash = null;
+    // keep correctly placed letters, clear the rest
+    r.letters = r.letters.map((ch, k) => (guess[k] === r.word[k]) ? ch : "");
+    r.locked = r.locked.map((l, k) => l || guess[k] === r.word[k]);
+    render();
+  }, 900);
+}
+
+function reveal() {
+  if (over) return;
+  const r = rows[active]; if (r.solved) return;
+  const k = r.locked.findIndex(l => !l);
+  if (k === -1) return;
+  r.letters[k] = r.word[k]; r.locked[k] = true; hints++;
+  updateStats();
+  if (r.locked.every(Boolean)) solveRow(r, active); else render();
+}
+
+function win() {
+  over = true; clearInterval(timer);
+  const final = currentScore();
+  stats.solved++; if (final > stats.best) stats.best = final; saveStats();
+  $("wTime").textContent = "-" + timePenalty();
+  $("wHint").textContent = "-" + hints * 5;
+  $("wMiss").textContent = "-" + mistakes * 2;
+  $("wFinal").textContent = final;
+  $("wBest").textContent = stats.best;
+  $("chainPreview").textContent = chain.join(" \u2192 ");
+  updateStats();
+  setTimeout(() => $("winModal").classList.add("open"), 600);
+}
+
+function share() {
+  const text = "Endless Chain \u{1F517}\nScore: " + currentScore() + " | Time: " + fmt(seconds) +
+    " | Hints: " + hints + " | Misses: " + mistakes;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast("Copied to clipboard"), () => toast(text));
+  } else toast(text);
+}
+
+// On-screen keyboard
+const layout = ["QWERTYUIOP", "ASDFGHJKL", "ENTER,ZXCVBNM,BKSP"];
+const kb = $("kb");
+layout.forEach(line => {
+  const row = document.createElement("div"); row.className = "krow";
+  const keys = line.includes(",") ? line.split(",").flatMap(p => (p === "ENTER" || p === "BKSP") ? [p] : p.split("")) : line.split("");
+  keys.forEach(k => {
+    const b = document.createElement("button");
+    b.className = "key" + (k === "ENTER" || k === "BKSP" ? " wide" : "");
+    b.textContent = k === "BKSP" ? "\u232B" : k;
+    b.addEventListener("click", () => {
+      if (k === "ENTER") submit(); else if (k === "BKSP") backspace(); else typeLetter(k);
+    });
+    row.appendChild(b);
+  });
+  kb.appendChild(row);
+});
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (document.querySelector(".modal.open")) return;
+  if (e.key === "Enter") submit();
+  else if (e.key === "Backspace") backspace();
+  else if (/^[a-zA-Z]$/.test(e.key)) typeLetter(e.key.toUpperCase());
+});
+
+$("clearBtn").addEventListener("click", clearRow);
+$("revealBtn").addEventListener("click", reveal);
+$("newBtn").addEventListener("click", newGame);
+$("nextBtn").addEventListener("click", newGame);
+$("shareBtn").addEventListener("click", share);
+$("helpBtn").addEventListener("click", () => $("helpModal").classList.add("open"));
+$("helpClose").addEventListener("click", () => $("helpModal").classList.remove("open"));
+
+newGame();
+try {
+  if (!localStorage.getItem("endlessChainSeen")) {
+    $("helpModal").classList.add("open");
+    localStorage.setItem("endlessChainSeen", "1");
+  }
+} catch (e) {}
+</script>
+</body>
+</html>
